@@ -101,8 +101,9 @@ class CombinationMode(enum.Enum):
     Combination mode for combining the pipeline and reverse pipeline.
     """
     MEAN = 'mean'
-    DATA_PER = 'data_per'
+    DATA_PER = 'data_per' # wbdi
     SIMILARITY = 'similarity'
+    WAM = 'wam' # Weighted Alpha Mapper - WAM
 
     @staticmethod
     def get_combination_mode(mode: str):
@@ -115,6 +116,8 @@ class CombinationMode(enum.Enum):
             return CombinationMode.DATA_PER
         elif mode == CombinationMode.SIMILARITY.value:
             return CombinationMode.SIMILARITY
+        elif mode == CombinationMode.WAM.value:
+            return CombinationMode.WAM
         else:
             raise ValueError(
                 f'Invalid combination mode: {mode}. Please choose from {CombinationMode}')
@@ -145,6 +148,15 @@ class Combined(Callback):
         # Tracking
         self.n_times_tracking = 0
         self.phase = 1
+    
+    def combine_wam_part(self, forecasted_values_forward, forecasted_values_reverse):
+        lenght = len(forecasted_values_forward)
+        e = 0.1
+        i = np.arange(lenght)
+        alpha = - 1/lenght * i * (1-2*e) + (1-e)
+        forecasted_values_combine = alpha*forecasted_values_forward + (1-alpha)*forecasted_values_reverse
+
+        return forecasted_values_combine
 
     def calculate_data_length(self, creator: CreateMissingDataFrame):
         """
@@ -207,6 +219,8 @@ class Combined(Callback):
                     # Combine the pipeline and reverse pipeline
                     combined_pipeline = alpha * pipe + \
                         (1 - alpha) * reverse_pipe
+                elif self.combination_mode == CombinationMode.WAM:
+                    combined_pipeline = self.combine_wam_part(pipe, reverse_pipe)
                 else:
                     raise ValueError(
                         f'Invalid combination mode: {self.combination_mode}. Please choose from {CombinationMode}')
